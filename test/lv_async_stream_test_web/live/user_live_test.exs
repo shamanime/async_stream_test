@@ -17,10 +17,18 @@ defmodule AsyncStreamTestWeb.UserLiveTest do
     setup [:create_user]
 
     test "lists all users", %{conn: conn, user: user} do
-      {:ok, _index_live, html} = live(conn, ~p"/users")
+      {:ok, index_live, _html} = live(conn, ~p"/users")
 
+      html = render_async(index_live)
       assert html =~ "Listing Users"
       assert html =~ user.name
+    end
+
+    test "displays the dialogs", %{conn: conn} do
+      {:ok, index_live, _html} = live(conn, ~p"/users")
+
+      render_async(index_live)
+      assert has_element?(index_live, "#delete-users-1")
     end
 
     test "saves new user", %{conn: conn} do
@@ -49,6 +57,8 @@ defmodule AsyncStreamTestWeb.UserLiveTest do
     test "updates user in listing", %{conn: conn, user: user} do
       {:ok, index_live, _html} = live(conn, ~p"/users")
 
+      render_async(index_live)
+
       assert index_live |> element("#users-#{user.id} a", "Edit") |> render_click() =~
                "Edit User"
 
@@ -72,6 +82,7 @@ defmodule AsyncStreamTestWeb.UserLiveTest do
     test "deletes user in listing", %{conn: conn, user: user} do
       {:ok, index_live, _html} = live(conn, ~p"/users")
 
+      render_async(index_live)
       assert index_live |> element("#users-#{user.id} a", "Delete") |> render_click()
       refute has_element?(index_live, "#users-#{user.id}")
     end

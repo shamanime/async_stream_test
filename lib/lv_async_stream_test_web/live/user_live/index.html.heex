@@ -7,28 +7,31 @@
   </:actions>
 </.header>
 
-<.table
-  id="users"
-  rows={@streams.users}
-  row_click={fn {_id, user} -> JS.navigate(~p"/users/#{user}") end}
->
-  <:col :let={{_id, user}} label="Name"><%= user.name %></:col>
-  <:col :let={{_id, user}} label="Age"><%= user.age %></:col>
-  <:action :let={{_id, user}}>
-    <div class="sr-only">
-      <.link navigate={~p"/users/#{user}"}>Show</.link>
-    </div>
-    <.link patch={~p"/users/#{user}/edit"}>Edit</.link>
-  </:action>
-  <:action :let={{id, user}}>
-    <.link
-      phx-click={JS.push("delete", value: %{id: user.id}) |> hide("##{id}")}
-      data-confirm="Are you sure?"
-    >
-      Delete
-    </.link>
-  </:action>
-</.table>
+<.async_result assign={@users}>
+  <:loading>Loading</:loading>
+  <.table
+    id="users"
+    rows={@streams.users}
+    row_click={fn {_id, user} -> JS.navigate(~p"/users/#{user}") end}
+  >
+    <:col :let={{_id, user}} label="Name"><%= user.name %></:col>
+    <:col :let={{_id, user}} label="Age"><%= user.age %></:col>
+    <:action :let={{_id, user}}>
+      <div class="sr-only">
+        <.link navigate={~p"/users/#{user}"}>Show</.link>
+      </div>
+      <.link patch={~p"/users/#{user}/edit"}>Edit</.link>
+    </:action>
+    <:action :let={{id, user}}>
+      <.link
+        phx-click={JS.push("delete", value: %{id: user.id}) |> hide("##{id}")}
+        data-confirm="Are you sure?"
+      >
+        Delete
+      </.link>
+    </:action>
+  </.table>
+</.async_result>
 
 <.modal :if={@live_action in [:new, :edit]} id="user-modal" show on_cancel={JS.patch(~p"/users")}>
   <.live_component
@@ -40,3 +43,9 @@
     patch={~p"/users"}
   />
 </.modal>
+<div>Dialogs:</div>
+<div id="dialogs" phx-update="stream">
+  <div :for={{dom_id, user} <- @streams.users} id={"delete-#{dom_id}"}>
+    Delete modal for user <%= user.name %> would go here
+  </div>
+</div>

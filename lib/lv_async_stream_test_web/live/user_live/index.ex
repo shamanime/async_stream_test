@@ -6,7 +6,11 @@ defmodule AsyncStreamTestWeb.UserLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, stream(socket, :users, Accounts.list_users())}
+    {:ok,
+     socket
+     |> stream(:users, [])
+     |> assign(:users, Phoenix.LiveView.AsyncResult.loading())
+     |> start_async(:fetch_users, fn -> Accounts.list_users() end)}
   end
 
   @impl true
@@ -43,5 +47,25 @@ defmodule AsyncStreamTestWeb.UserLive.Index do
     {:ok, _} = Accounts.delete_user(user)
 
     {:noreply, stream_delete(socket, :users, user)}
+  end
+
+  @impl true
+  def handle_async(:fetch_users, {:ok, new_users}, socket) do
+    %{users: users} = socket.assigns
+    Process.sleep(1000)
+
+    {:noreply,
+     socket
+     |> stream(:users, new_users)
+     |> assign(:users, Phoenix.LiveView.AsyncResult.ok(users, nil))}
+  end
+
+  def handle_async(:fetch_users, failure, socket) do
+    %{users: users} = socket.assigns
+
+    {:noreply,
+     socket
+     |> stream(:users, users)
+     |> assign(:users, Phoenix.LiveView.AsyncResult.failed(users, failure))}
   end
 end
