@@ -24,11 +24,11 @@ defmodule AsyncStreamTestWeb.UserLiveTest do
       assert html =~ user.name
     end
 
-    test "displays the dialogs", %{conn: conn} do
+    test "displays the dialogs", %{conn: conn, user: user} do
       {:ok, index_live, _html} = live(conn, ~p"/users")
 
       render_async(index_live)
-      assert has_element?(index_live, "#delete-users-1")
+      assert has_element?(index_live, "#delete-users-#{user.id}")
     end
 
     test "saves new user", %{conn: conn} do
