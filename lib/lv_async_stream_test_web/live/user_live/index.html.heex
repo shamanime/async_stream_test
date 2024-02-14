@@ -43,9 +43,3 @@
     patch={~p"/users"}
   />
 </.modal>
-<div>Dialogs:</div>
-<div id="dialogs" phx-update="stream">
-  <div :for={{dom_id, user} <- @streams.users} id={"delete-#{dom_id}"}>
-    Delete modal for user <%= user.name %> would go here
-  </div>
-</div>
