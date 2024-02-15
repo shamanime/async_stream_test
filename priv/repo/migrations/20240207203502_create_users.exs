@@ -5,6 +5,8 @@ defmodule AsyncStreamTest.Repo.Migrations.CreateUsers do
     create table(:users) do
       add :name, :string
       add :age, :integer
+      add :fruits, {:array, :string}
+      add :cars, {:array, :string}
 
       timestamps(type: :utc_datetime)
     end

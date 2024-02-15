@@ -3,6 +3,15 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
 
   alias AsyncStreamTest.Accounts
 
+  @entries %{
+    "banana" => "Banana",
+    "apple" => "Apple",
+    "watermelon" => "Watermelon",
+    "tesla" => "Tesla",
+    "hyundai" => "Hyundai",
+    "honda" => "Honda"
+  }
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -21,6 +30,8 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
       >
         <.input field={@form[:name]} type="text" label="Name" />
         <.input field={@form[:age]} type="number" label="Age" />
+        <.live_select field={@form[:fruits]} label="Fruits" phx-target={@myself} mode={:tags} />
+        <.live_select field={@form[:cars]} label="Cars" phx-target={@myself} mode={:tags} />
         <:actions>
           <.button phx-disable-with="Saving...">Save User</.button>
         </:actions>
@@ -51,6 +62,20 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
 
   def handle_event("save", %{"user" => user_params}, socket) do
     save_user(socket, socket.assigns.action, user_params)
+  end
+
+  def handle_event("live_select_change", %{"text" => text, "id" => live_select_id}, socket) do
+    options =
+      @entries
+      |> Enum.filter(fn {_k, e} -> String.contains?(String.downcase(e), String.downcase(text)) end)
+      |> Enum.map(fn {k, v} -> {v, k} end)
+      |> Enum.into(%{})
+
+    dbg(options)
+
+    send_update(LiveSelect.Component, id: live_select_id, options: options)
+
+    {:noreply, socket}
   end
 
   defp save_user(socket, :edit, user_params) do

@@ -52,7 +52,6 @@ defmodule AsyncStreamTestWeb.UserLive.Index do
   @impl true
   def handle_async(:fetch_users, {:ok, new_users}, socket) do
     %{users: users} = socket.assigns
-    Process.sleep(1000)
 
     {:noreply,
      socket
