@@ -5,8 +5,8 @@ defmodule AsyncStreamTest.Accounts.User do
   schema "users" do
     field :name, :string
     field :age, :integer
-    field :cars, {:array, :string}
-    field :fruits, {:array, :string}
+    embeds_many :fruits, AsyncStreamTest.Accounts.Item, on_replace: :delete
+    embeds_many :cars, AsyncStreamTest.Accounts.Item, on_replace: :delete
 
     timestamps(type: :utc_datetime)
   end
@@ -14,7 +14,24 @@ defmodule AsyncStreamTest.Accounts.User do
   @doc false
   def changeset(user, attrs) do
     user
-    |> cast(attrs, [:name, :age, :cars, :fruits])
+    |> cast(attrs, [:name, :age])
     |> validate_required([:name, :age])
+    |> cast_embed(:fruits)
+    |> cast_embed(:cars)
+  end
+end
+
+defmodule AsyncStreamTest.Accounts.Item do
+  use Ecto.Schema
+  import Ecto.Changeset
+
+  embedded_schema do
+    field :name
+  end
+
+  def changeset(item, attrs) do
+    item
+    |> cast(attrs, [:name])
+    |> validate_required([:name])
   end
 end
