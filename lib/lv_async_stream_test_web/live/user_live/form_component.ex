@@ -31,25 +31,19 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
         <.input field={@form[:name]} type="text" label="Name" />
         <.input field={@form[:age]} type="number" label="Age" />
         <.live_select
-          id="fruits_lvs"
-          field={@form[:fruits_selection]}
+          field={@form[:fruits]}
           label="Fruits"
+          value_mapper={&value_mapper/1}
           phx-target={@myself}
           mode={:tags}
         />
         <.live_select
-          id="cars_lvs"
-          field={@form[:cars_selection]}
+          field={@form[:cars]}
           label="Cars"
+          value_mapper={&value_mapper/1}
           phx-target={@myself}
           mode={:tags}
         />
-        <.inputs_for :let={f_nested} field={@form[:fruits]}>
-          <.input type="hidden" field={f_nested[:name]} />
-        </.inputs_for>
-        <.inputs_for :let={f_nested} field={@form[:cars]}>
-          <.input type="hidden" field={f_nested[:name]} />
-        </.inputs_for>
         <:actions>
           <.button phx-disable-with="Saving...">Save User</.button>
         </:actions>
@@ -58,23 +52,14 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
     """
   end
 
+  # the value_mapper function is passed to LiveSelect. Its job is to convert the values LiveSelect receives through the form 
+  # into the correct options. The options should have the same format as the options set by the "live_select_change" event handler
+  # This means that the value should have the data needed to create an Accounts.Item struct, and the label should be the label that the user expects
+  defp value_mapper(%{name: name}), do: %{label: String.capitalize(name), value: %{name: name}}
+
   @impl true
   def update(%{user: user} = assigns, socket) do
     changeset = Accounts.change_user(user)
-
-    if user.fruits do
-      send_update(LiveSelect.Component,
-        id: "fruits_lvs",
-        value: Enum.map(user.fruits, fn v -> %{label: @entries[v.name], value: v.name} end)
-      )
-    end
-
-    if user.cars do
-      send_update(LiveSelect.Component,
-        id: "cars_lvs",
-        value: Enum.map(user.cars, fn v -> %{label: @entries[v.name], value: v.name} end)
-      )
-    end
 
     {:ok,
      socket
@@ -82,102 +67,25 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
      |> assign_form(changeset)}
   end
 
-  @impl true
-  def handle_event(
-        "validate",
-        %{"_target" => ["user", "cars_selection"], "user" => user_params},
-        socket
-      ) do
-    %{"cars_selection" => selection} = user_params
+  defp decode(nil), do: []
+  defp decode(list), do: Enum.map(list, &Jason.decode!/1)
 
-    user_params =
-      Map.merge(
-        user_params,
-        %{
-          "cars" =>
-            selection
-            |> Enum.with_index()
-            |> Enum.map(fn {value, idx} ->
-              {to_string(idx), %{"name" => value}}
-            end)
-            |> Enum.into(%{})
-        }
-      )
-
-    changeset =
-      socket.assigns.user
-      |> Accounts.change_user(user_params)
-      |> Map.put(:action, :validate)
-
-    socket
-    |> assign_form(changeset)
-    |> then(&{:noreply, &1})
-  end
-
-  def handle_event(
-        "validate",
-        %{"_target" => ["user", "fruits_selection"], "user" => user_params},
-        socket
-      ) do
-    %{"fruits_selection" => selection} = user_params
-
-    user_params =
-      Map.merge(
-        user_params,
-        %{
-          "fruits" =>
-            selection
-            |> Enum.with_index()
-            |> Enum.map(fn {value, idx} ->
-              {to_string(idx), %{"name" => value}}
-            end)
-            |> Enum.into(%{})
-        }
-      )
-
-    changeset =
-      socket.assigns.user
-      |> Accounts.change_user(user_params)
-      |> Map.put(:action, :validate)
-
-    socket
-    |> assign_form(changeset)
-    |> then(&{:noreply, &1})
-  end
-
-  def handle_event(
-        "validate",
-        %{"_target" => ["user", "fruits_selection_empty_selection"], "user" => user_params},
-        socket
-      ) do
-    user_params = Map.put(user_params, "fruits", %{})
-
-    changeset =
-      socket.assigns.user
-      |> Accounts.change_user(user_params)
-      |> Map.put(:action, :validate)
-
-    {:noreply, assign_form(socket, changeset)}
-  end
-
-  def handle_event(
-        "validate",
-        %{"_target" => ["user", "cars_selection_empty_selection"], "user" => user_params},
-        socket
-      ) do
-    user_params = Map.put(user_params, "cars", %{})
-
-    dbg(user_params)
-
-    changeset =
-      socket.assigns.user
-      |> Accounts.change_user(user_params)
-      |> Map.put(:action, :validate)
-
-    {:noreply, assign_form(socket, changeset)}
+  defp decode_params(user_params) do
+    user_params
+    |> update_in(["cars"], &decode/1)
+    |> update_in(["fruits"], &decode/1)
   end
 
   def handle_event("validate", %{"user" => user_params}, socket) do
+    # Whenever we want to recreate the User struct from the params, we first need to
+    # decode the parameters for "cars" and "fruits", because they are sent as a list of JSON-encoded values
+    # We use the decode_params function for this, which is simple enough... 
+    # However: could such a function be a helper offered by LiveSelect itself? (e.g. LiveSelect.decode/1)
+
+    user_params = decode_params(user_params)
+
+    # now user params is ready to be passed to the user changeset!
+    
     changeset =
       socket.assigns.user
       |> Accounts.change_user(user_params)
@@ -187,16 +95,19 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
   end
 
   def handle_event("save", %{"user" => user_params}, socket) do
-    save_user(socket, socket.assigns.action, user_params)
+    # Same thing applies here as for the "validate" event
+    
+    save_user(socket, socket.assigns.action, decode_params(user_params))
   end
 
   def handle_event("live_select_change", %{"text" => text, "id" => live_select_id}, socket) do
+    # If we want to be able to recreate Accounts.Item structs from the values in the form, we need the values to have
+    # the shape expected by the Accounts.Item changeset (e.g. %{name: name})
     options =
       @entries
-      |> Enum.filter(fn {_k, e} -> String.contains?(String.downcase(e), String.downcase(text)) end)
-      |> Enum.map(fn {k, v} -> {v, k} end)
-      |> Enum.into(%{})
-
+      |> Enum.filter(fn {_k, v} -> String.contains?(String.downcase(v), String.downcase(text)) end)
+      |> Enum.map(fn {k, v} -> %{label: v, value: %{name: k}} end)
+      
     send_update(LiveSelect.Component, id: live_select_id, options: options)
 
     {:noreply, socket}
@@ -233,7 +144,8 @@ defmodule AsyncStreamTestWeb.UserLive.FormComponent do
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
-    assign(socket, :form, to_form(changeset))
+    form = to_form(changeset)
+    assign(socket, :form, form)
   end
 
   defp notify_parent(msg), do: send(self(), {__MODULE__, msg})

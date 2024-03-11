@@ -35,3 +35,6 @@ lv_async_stream_test-*.tar
 npm-debug.log
 /assets/node_modules/
 
+
+.idea
+*.iml
